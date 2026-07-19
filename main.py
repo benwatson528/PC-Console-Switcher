@@ -252,20 +252,24 @@ class App(ctk.CTk):
     def set_default_audio(self, device_name):
         if not device_name or device_name == "Select...": return
         
-        clean_name = device_name.split(" (")[0].strip()
-        
         nircmd_path = resource_path("nircmd.exe")
+        if not os.path.exists(nircmd_path):
+            logging.error(f"nircmd.exe not found at {nircmd_path}")
+            return
         
-        if os.path.exists(nircmd_path):
-            logging.info(f"Probando NirCmd con nombre exacto: {clean_name}")
-            
-            cmd = [nircmd_path, "setdefaultsounddevice", clean_name, "1"]
-            subprocess.run(cmd, creationflags=subprocess.CREATE_NO_WINDOW)
-            subprocess.run(f'"{nircmd_path}" setdefaultsounddevice "{clean_name}" 1', shell=True)
-            subprocess.run(f'"{nircmd_path}" setdefaultsounddevice "{clean_name}" 2', shell=True)
-            logging.info("Comandos de audio enviados.")
-        else:
-            logging.error(f"nircmd.exe no encontrado en {nircmd_path}")
+        names_to_try = [device_name]
+        stripped = device_name.split(" (")[0].strip()
+        if stripped and stripped != device_name:
+            names_to_try.append(stripped)
+        
+        for name in names_to_try:
+            for flag in ["0", "2"]:
+                cmd = [nircmd_path, "setdefaultsounddevice", name, flag]
+                try:
+                    result = subprocess.run(cmd, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                    logging.info(f"nircmd setdefaultsounddevice '{name}' flag={flag}: rc={result.returncode}")
+                except Exception as e:
+                    logging.error(f"Error running nircmd: {e}")
 
     def set_primary_display(self, display_name):
         if not display_name or display_name == "Select...": return
@@ -295,6 +299,105 @@ class App(ctk.CTk):
             else:
                 subprocess.run([nircmd_path, "setcursor", "5000", "5000"], creationflags=subprocess.CREATE_NO_WINDOW)
     
+    def disable_tv_display(self, display_name):
+        if not display_name or display_name == "Select...": return
+        
+        try:
+            import ctypes
+            from ctypes import wintypes
+            
+            user32 = ctypes.windll.user32
+            
+            class DISPLAY_DEVICE(ctypes.Structure):
+                _fields_ = [
+                    ('cb', wintypes.DWORD),
+                    ('DeviceName', ctypes.c_wchar * 32),
+                    ('DeviceString', ctypes.c_wchar * 128),
+                    ('StateFlags', wintypes.DWORD),
+                    ('DeviceID', ctypes.c_wchar * 128),
+                    ('DeviceKey', ctypes.c_wchar * 128),
+                ]
+            
+            class DEVMODE(ctypes.Structure):
+                _fields_ = [
+                    ('dmDeviceName', ctypes.c_wchar * 32),
+                    ('dmSpecVersion', ctypes.c_ushort),
+                    ('dmDriverVersion', ctypes.c_ushort),
+                    ('dmSize', ctypes.c_ushort),
+                    ('dmDriverExtra', ctypes.c_ushort),
+                    ('dmFields', ctypes.c_uint),
+                    ('dmPositionX', ctypes.c_long),
+                    ('dmPositionY', ctypes.c_long),
+                    ('dmDisplayOrientation', ctypes.c_ulong),
+                    ('dmDisplayFixedOutput', ctypes.c_ulong),
+                    ('dmPaperSize', ctypes.c_short),
+                    ('dmPaperLength', ctypes.c_short),
+                    ('dmPaperWidth', ctypes.c_short),
+                    ('dmScale', ctypes.c_short),
+                    ('dmCopies', ctypes.c_short),
+                    ('dmDefaultSource', ctypes.c_short),
+                    ('dmPrintQuality', ctypes.c_short),
+                    ('dmColor', ctypes.c_short),
+                    ('dmDuplex', ctypes.c_short),
+                    ('dmYResolution', ctypes.c_short),
+                    ('dmTTOption', ctypes.c_short),
+                    ('dmCollate', ctypes.c_short),
+                    ('dmFormName', ctypes.c_wchar * 32),
+                    ('dmLogPixels', ctypes.c_ushort),
+                    ('dmBitsPerPel', ctypes.c_uint),
+                    ('dmPelsWidth', ctypes.c_uint),
+                    ('dmPelsHeight', ctypes.c_uint),
+                    ('dmDisplayFlags', ctypes.c_uint),
+                    ('dmDisplayFrequency', ctypes.c_uint),
+                    ('dmICMMethod', ctypes.c_uint),
+                    ('dmICMIntent', ctypes.c_uint),
+                    ('dmMediaType', ctypes.c_uint),
+                    ('dmDitherType', ctypes.c_uint),
+                    ('dmReserved1', ctypes.c_uint),
+                    ('dmReserved2', ctypes.c_uint),
+                    ('dmPanningWidth', ctypes.c_uint),
+                    ('dmPanningHeight', ctypes.c_uint),
+                ]
+            
+            DM_PELSWIDTH = 0x00000008
+            DM_PELSHEIGHT = 0x00000010
+            CDS_UPDATEREGISTRY = 0x00000001
+            CDS_NORESET = 0x00000004
+            
+            dd = DISPLAY_DEVICE()
+            dd.cb = ctypes.sizeof(dd)
+            
+            for i in range(16):
+                if not user32.EnumDisplayDevicesW(None, i, ctypes.byref(dd), 0):
+                    break
+                
+                if dd.DeviceName == display_name:
+                    logging.info(f"Disabling TV display: {dd.DeviceName}")
+                    
+                    dm = DEVMODE()
+                    dm.dmSize = ctypes.sizeof(dm)
+                    dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT
+                    dm.dmPelsWidth = 0
+                    dm.dmPelsHeight = 0
+                    
+                    user32.ChangeDisplaySettingsExW(
+                        dd.DeviceName, ctypes.byref(dm), None,
+                        CDS_UPDATEREGISTRY | CDS_NORESET, None
+                    )
+                    user32.ChangeDisplaySettingsExW(
+                        dd.DeviceName, None, None, 0, None
+                    )
+                    logging.info(f"TV display {dd.DeviceName} disabled successfully")
+                    return
+                
+                dd = DISPLAY_DEVICE()
+                dd.cb = ctypes.sizeof(dd)
+            
+            logging.warning(f"Display '{display_name}' not found for disabling")
+        
+        except Exception as e:
+            logging.error(f"Error disabling TV display: {e}")
+
     def show_status_overlay(self, message):
         overlay = tk.Toplevel(self)
         overlay.overrideredirect(True)
@@ -357,6 +460,9 @@ class App(ctk.CTk):
         pc_displays = self.config_data.get("pc_displays", [])
         if pc_displays:
             self.set_primary_display(pc_displays[0])
+
+        tv_monitor = self.config_data.get("tv_monitor", "")
+        self.disable_tv_display(tv_monitor)
 
         pc_audio = self.config_data.get("pc_audio", "")
         self.set_default_audio(pc_audio)
