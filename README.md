@@ -28,11 +28,7 @@ Configure in App: Open the PC-Console Switcher, navigate to the Profiles & Audio
 
 Save: Click "Save Settings".
 
-The "Ideal Scenario" Setup: Once configured, navigate to Windows Settings > System > Display. Select your TV and choose "Disconnect this display".
-
-![Image2](Images/Screenshot_4.jpg)
-
-Why? By doing this, Windows saves this state in the registry. When the app sends the /extend command, Windows will remember to keep the TV disconnected while your PC monitors are active, preventing the PC from sending a signal to a display that isn't in use.
+Note: The app automatically disables the TV display when switching back to PC mode, so no manual Windows display configuration is needed.
 
 2. Controller Mapping
 Go to the Controller & Power tab.
@@ -58,4 +54,19 @@ To exit, select "Exit" from the tray menu.
 
 4. Windows Startup
 Enable the "Run at Windows startup" checkbox in the Steam tab to ensure your switcher is always active and ready to handle your controller wake-up signals.
+
+=============Building from Source==============
+Prerequisites: Python 3.10+ and pip.
+
+1. Clone the repository:
+   git clone https://github.com/yourusername/PC-Console-Switcher.git
+   cd PC-Console-Switcher
+
+2. Install dependencies:
+   pip install -r requirements.txt
+
+3. Build the executable:
+   Double-click build.bat (or run it from a terminal).
+
+The compiled executable will be in the dist/ folder.
 

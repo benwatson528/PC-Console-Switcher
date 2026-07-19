@@ -1,0 +1,7 @@
+customtkinter
+Pillow
+screeninfo
+sounddevice
+XInput-Python
+pystray
+pyinstaller
