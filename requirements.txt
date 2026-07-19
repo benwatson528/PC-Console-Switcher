@@ -2,6 +2,6 @@ customtkinter
 Pillow
 screeninfo
 sounddevice
-xinput
+XInput-Python
 pystray
 pyinstaller

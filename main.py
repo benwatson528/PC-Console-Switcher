@@ -436,6 +436,8 @@ class App(ctk.CTk):
         tv_monitor = self.config_data.get("tv_monitor", "")
         self.set_primary_display(tv_monitor)
 
+        self.detect_hardware()
+
         tv_audio = self.config_data.get("tv_audio", "")
         self.set_default_audio(tv_audio)
         
@@ -570,12 +572,16 @@ class App(ctk.CTk):
 
         try:
             audio_devices = []
-            for d in sd.query_devices():
+            all_devices = sd.query_devices()
+            logging.info(f"Audio devices found by sounddevice: {len(all_devices)}")
+            for d in all_devices:
+                logging.info(f"  Device: {d['name']} | channels: {d['max_output_channels']} | hostapi: {d['hostapi']}")
                 if d['max_output_channels'] > 0:
                     clean_name = d['name'].strip()
                     if "Microsoft Sound Mapper" not in clean_name and "Primary Sound Capture Driver" not in clean_name:
                         if clean_name not in audio_devices:
                             audio_devices.append(clean_name)
+            logging.info(f"Filtered audio output devices: {audio_devices}")
             if audio_devices:
                 self.combo_tv_audio.configure(values=audio_devices)
                 self.combo_pc_audio.configure(values=audio_devices)
